@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 
-MASTER_CSV = Path(__file__).parent.parent / "Data" / "transactions.csv"
+MASTER_CSV = Path(__file__).parent.parent / "data" / "transactions.csv"
 
 
 @st.cache_data

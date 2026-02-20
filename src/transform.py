@@ -15,14 +15,14 @@ MASTER_CSV = Path(__file__).parent.parent / "data" / "transactions.csv" # this i
 
 def clean_raw(df: pd.DataFrame) -> pd.DataFrame:
 
-    # renaming columns for clarity
+    # renaming columns for clarity, using "NOTES " because original csv has blank
     df = df.rename(columns={
-        "Time": "datetime",
+        "TIME": "datetime",
         "TYPE": "type",
         "AMOUNT": "amount",
         "CATEGORY": "category",
         "ACCOUNT": "account",
-        "NOTES": "notes",
+        "NOTES ": "notes",
     })
 
     # extracting date relevant features from datetime
