@@ -32,6 +32,7 @@ Use this file to preserve context between sessions.
 - Added teaching-style comments in key files.
 - Added canonical schema + validation checks to transform pipeline.
 - Added account balance engine to compute transfer-aware running balances per account.
+- Added dashboard account views: running balance timeline and period-end allocation.
 
 ### Validation
 - Commands run:
@@ -39,11 +40,12 @@ Use this file to preserve context between sessions.
   - `python src/transform.py`
   - `python -m py_compile main.py src/balance.py src/helpers.py`
   - `python main.py`
+  - `python -m py_compile app.py`
 - Result:
   - pass
 
 ### Next Step
-- Step 3: add account balance timeline and allocation charts to the dashboard UI.
+- Step 4: transfer integrity pass to avoid KPI/chart double-counting edge cases.
 
 ### Blockers / Questions
 - None.

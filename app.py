@@ -13,7 +13,7 @@ to maintain, test, and grow as features/pages are added.
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-from src.helpers import load_data
+from src.helpers import load_data, load_account_balances
 
 # In Streamlit, page config must be set before rendering any widgets or text.
 # `layout="wide"` allows charts/tables to use the full browser width.
@@ -30,6 +30,7 @@ if df.empty:
 
 # Keep a pure date column for sidebar date filtering (faster/cleaner than filtering datetimes repeatedly).
 df["date"] = df["datetime"].dt.date
+balances = load_account_balances().copy()
 
 
 def get_preset_range(preset: str, anchor_date, min_date):
@@ -146,6 +147,58 @@ with col5:
     # `hole=0.4` turns a pie into a donut, improving label readability.
     fig2 = px.pie(cat, values="amount", names="category", hole=0.4)
     st.plotly_chart(fig2, width="stretch")
+
+st.divider()
+
+# --- account views ---
+st.subheader("Account Balance Views")
+account_col1, account_col2 = st.columns(2)
+
+# Timeline shows only dates inside the selected filter window.
+balances_in_range = balances[
+    (balances["date"] >= start_date) &
+    (balances["date"] <= end_date)
+].copy()
+
+# Allocation snapshot uses the latest known balance per account up to end_date.
+allocation_snapshot = (
+    balances[balances["date"] <= end_date]
+    .sort_values(["account", "date"])
+    .groupby("account", as_index=False)
+    .tail(1)
+    .sort_values("running_balance", ascending=False)
+)
+
+with account_col1:
+    st.caption("Running balance by account")
+    if balances_in_range.empty:
+        st.info("No account balance data available for the selected date range.")
+    else:
+        fig3 = px.line(
+            balances_in_range,
+            x="date",
+            y="running_balance",
+            color="account",
+            markers=True,
+        )
+        st.plotly_chart(fig3, width="stretch")
+
+with account_col2:
+    st.caption("Asset allocation at period end")
+    if allocation_snapshot.empty:
+        st.info("No account balances found up to the selected end date.")
+    else:
+        positive_balances = allocation_snapshot[allocation_snapshot["running_balance"] > 0]
+        if positive_balances.empty:
+            st.info("No positive balances available for allocation view.")
+        else:
+            fig4 = px.pie(
+                positive_balances,
+                values="running_balance",
+                names="account",
+                hole=0.4,
+            )
+            st.plotly_chart(fig4, width="stretch")
 
 # --- log of transactions ---
 # Transaction log is kept interactive (sorting, scrolling, column resize).

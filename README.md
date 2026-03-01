@@ -55,6 +55,8 @@ Build in small vertical slices, with each step as a clean git stopping point.
   - KPI cards (income, expenses, net)
   - monthly income vs expense chart
   - spending by category chart
+  - account running balance timeline
+  - account allocation at selected period end
   - transaction log table
 
 ## Session Workflow
