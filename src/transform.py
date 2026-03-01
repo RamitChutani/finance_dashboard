@@ -95,6 +95,15 @@ def validate_canonical_schema(df: pd.DataFrame) -> None:
     if df["is_opening_balance"].dtype != bool:
         raise ValueError("`is_opening_balance` must be boolean.")
 
+    # Lean transfer integrity checks based on source-app export rules.
+    has_transfer_arrow = df["account"].astype(str).str.contains("->", regex=False)
+    transfer_rows = df["type"] == "Transfer"
+
+    if (~has_transfer_arrow[transfer_rows]).any():
+        raise ValueError("Transfer rows must use `from_account->to_account` in `account`.")
+    if has_transfer_arrow[~transfer_rows].any():
+        raise ValueError("Non-transfer rows must not contain `->` in `account`.")
+
 
 def normalize_canonical_types(df: pd.DataFrame) -> pd.DataFrame:
     # Canonical type normalization ensures dedupe compares like-for-like values.
