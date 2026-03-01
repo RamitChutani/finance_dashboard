@@ -37,11 +37,23 @@ Run transform before launching the app if raw files changed.
 ## Commit & Pull Request Guidelines
 - Current history uses short, plain-English commit subjects (for example: `initial project setup`).
 - Prefer concise, imperative subjects under ~72 chars, one concern per commit.
+- Commit after each distinct update (small vertical slices) to preserve clean stopping points.
 - PRs should include:
   - What changed and why.
   - Any data/model assumptions.
   - UI screenshots/GIFs for dashboard changes.
   - Steps used to validate locally.
+
+## Session Continuity Workflow
+- Maintain `docs/WORKLOG.md` as the restart context file for future sessions.
+- At end of session:
+  - run quick checks (`uv run python src/transform.py`, `uv run python main.py`)
+  - commit the distinct update
+  - append a short worklog entry (`what changed`, `what is next`, `blockers/questions`)
+- At start of next session:
+  - check `git log --oneline -n 10` and `git status`
+  - read `README.md` and latest `docs/WORKLOG.md` entry first
+  - then start implementation
 
 ## Security & Configuration Tips
 - Do not commit personal financial exports beyond intended sample data.

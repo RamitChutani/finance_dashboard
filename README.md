@@ -56,6 +56,29 @@ Build in small vertical slices, with each step as a clean git stopping point.
   - spending by category chart
   - transaction log table
 
+## Session Workflow
+Use this workflow when ending and resuming work across days.
+
+### End-of-day checklist
+1. Run quick checks:
+- `uv run python src/transform.py`
+- `uv run python main.py`
+2. Commit a distinct update with a short plain-English message.
+3. Add a brief entry to `docs/WORKLOG.md`:
+- what changed
+- what is next
+- blockers/questions
+
+### Start-of-day checklist
+1. Inspect repo state:
+- `git log --oneline -n 10`
+- `git status`
+2. Read context:
+- this `README.md`
+- latest entry in `docs/WORKLOG.md`
+3. Run app:
+- `uv run streamlit run app.py`
+
 ## Canonical Transaction Schema
 The cleaned dataset (`data/transactions.csv`) contains:
 - `datetime` (`datetime64[ns]`)
