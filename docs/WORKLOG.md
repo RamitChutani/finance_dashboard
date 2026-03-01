@@ -33,6 +33,10 @@ Use this file to preserve context between sessions.
 - Added canonical schema + validation checks to transform pipeline.
 - Added account balance engine to compute transfer-aware running balances per account.
 - Added dashboard account views: running balance timeline and period-end allocation.
+- Fixed transaction duplication in transform dedupe logic (canonical normalization + stable dedupe keys).
+- Fixed date range edge-case crash in Streamlit custom date filter.
+- Added lean transfer format validation rules (`Transfer` requires `from->to`; non-transfer forbids `->`).
+- Added Groww opening balance entry (`2088.39` on `2025-04-09`) to local transaction data.
 
 ### Validation
 - Commands run:
@@ -41,11 +45,13 @@ Use this file to preserve context between sessions.
   - `python -m py_compile main.py src/balance.py src/helpers.py`
   - `python main.py`
   - `python -m py_compile app.py`
+  - `python src/transform.py`
+  - `python main.py`
 - Result:
   - pass
 
 ### Next Step
-- Step 4: transfer integrity pass to avoid KPI/chart double-counting edge cases.
+- Step 5: add budget data model (`budgets.csv` + loader) with simple schema validation.
 
 ### Blockers / Questions
 - None.
