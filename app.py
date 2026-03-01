@@ -58,6 +58,27 @@ def get_preset_range(preset: str, anchor_date, min_date):
     ).date()
     return max(start_date, min_date), anchor_date
 
+
+def normalize_date_range(selected_dates):
+    # Handle Streamlit date_input return shapes robustly across reruns/state restores.
+    if isinstance(selected_dates, (tuple, list)):
+        flat_dates = [d for d in selected_dates if not isinstance(d, (tuple, list))]
+        if len(flat_dates) >= 2:
+            start_date = pd.to_datetime(flat_dates[0]).date()
+            end_date = pd.to_datetime(flat_dates[1]).date()
+        elif len(flat_dates) == 1:
+            start_date = pd.to_datetime(flat_dates[0]).date()
+            end_date = start_date
+        else:
+            raise ValueError("Date range selection is empty.")
+    else:
+        start_date = pd.to_datetime(selected_dates).date()
+        end_date = start_date
+
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+    return start_date, end_date
+
 # Sidebar controls should be defined first because they determine the filtered dataset
 # that every metric, chart, and table uses below.
 
@@ -83,14 +104,7 @@ else:
         min_value=min_date,
         max_value=anchor_date,
     )
-    # date_input may return a single date if only one is selected; normalize to a 2-date range.
-    if isinstance(selected_dates, tuple) and len(selected_dates) == 2:
-        start_date, end_date = selected_dates
-    else:
-        start_date, end_date = selected_dates, selected_dates
-    # Defensive normalization if user input comes in reverse order.
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
+    start_date, end_date = normalize_date_range(selected_dates)
 
 # Show the resolved range so users can verify exactly what period is active.
 st.sidebar.caption(f"Range: {start_date} to {end_date}")

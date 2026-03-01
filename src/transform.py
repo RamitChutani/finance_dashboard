@@ -36,6 +36,7 @@ CANONICAL_COLUMNS = [
     "signed_amount",
     "is_opening_balance",
 ]
+TRANSACTION_DEDUPE_KEYS = ["datetime", "type", "amount", "category", "account", "notes"]
 ALLOWED_TYPES = {"Income", "Expense", "Transfer"}
 
 
@@ -54,34 +55,19 @@ def clean_raw(df: pd.DataFrame) -> pd.DataFrame:
     # Rename export columns to project-level canonical names.
     df = df.rename(columns=RAW_TO_CANONICAL_COLS)
 
-    # extracting date relevant features from datetime
+    # Normalize fundamental fields first.
     df["datetime"] = pd.to_datetime(df["datetime"], format="mixed", errors="raise")
     df["amount"] = pd.to_numeric(df["amount"], errors="raise")
     if (df["amount"] < 0).any():
         raise ValueError("Raw AMOUNT must be non-negative; sign is derived from TYPE.")
-
-    df["date"] = df["datetime"].dt.date
-    df["month"] = df["datetime"].dt.month
-    df["year"] = df["datetime"].dt.year
-    df["day"] = df["datetime"].dt.day
 
     # cleaning the type column values to remove prefixes
     df["type"] = df["type"].str.replace(r"^[\(\+\-\*\) ]+", "", regex=True).str.strip()
     unknown_types = set(df["type"].dropna().unique()) - ALLOWED_TYPES
     if unknown_types:
         raise ValueError(f"Unsupported transaction type(s): {sorted(unknown_types)}")
-    
-    # creating new column to make amount value positive for income, negative for expense, 0 for transfers across accounts
-    df["signed_amount"] = df.apply(
-        lambda r: r["amount"] if r["type"] == "Income"
-        else (-r["amount"] if r["type"] == "Expense" else 0),
-        axis = 1
-    )
 
-    # flagging rows that are not real transactions, but opening balance rows for various accounts
-    df["is_opening_balance"] = df["notes"].str.lower().str.contains("starting|opening balance", na=False)
-
-    df = df[CANONICAL_COLUMNS]
+    df = normalize_canonical_types(df)
     validate_canonical_schema(df)
     return df
 
@@ -109,6 +95,33 @@ def validate_canonical_schema(df: pd.DataFrame) -> None:
     if df["is_opening_balance"].dtype != bool:
         raise ValueError("`is_opening_balance` must be boolean.")
 
+
+def normalize_canonical_types(df: pd.DataFrame) -> pd.DataFrame:
+    # Canonical type normalization ensures dedupe compares like-for-like values.
+    work = df.copy()
+    work["datetime"] = pd.to_datetime(work["datetime"], format="mixed", errors="raise")
+    work["type"] = work["type"].astype(str).str.strip()
+    work["amount"] = pd.to_numeric(work["amount"], errors="raise")
+    if (work["amount"] < 0).any():
+        raise ValueError("`amount` must be non-negative in canonical storage.")
+
+    work["category"] = work["category"].fillna("").astype(str).str.strip()
+    work["account"] = work["account"].fillna("").astype(str).str.strip()
+    work["notes"] = work["notes"].fillna("").astype(str)
+
+    work["date"] = work["datetime"].dt.date
+    work["month"] = work["datetime"].dt.month
+    work["year"] = work["datetime"].dt.year
+    work["day"] = work["datetime"].dt.day
+    work["signed_amount"] = work.apply(
+        lambda r: r["amount"] if r["type"] == "Income"
+        else (-r["amount"] if r["type"] == "Expense" else 0),
+        axis=1,
+    )
+    work["is_opening_balance"] = work["notes"].str.lower().str.contains("starting|opening balance", na=False)
+    return work[CANONICAL_COLUMNS]
+
+
 def run():
     raw_files = list(RAW_DIR.glob("*.csv")) # creates a list of paths to be read later
     if not raw_files:
@@ -123,11 +136,11 @@ def run():
         missing_master_cols = sorted(set(CANONICAL_COLUMNS) - set(master.columns))
         if missing_master_cols:
             raise ValueError(f"Existing master CSV is missing required column(s): {missing_master_cols}")
+        master = normalize_canonical_types(master)
 
     combined = pd.concat([master, cleaned], ignore_index=True) # add latest cleaned csv to master
-    combined = combined[CANONICAL_COLUMNS]
-    combined["datetime"] = pd.to_datetime(combined["datetime"], format="mixed", errors="raise")
-    combined = combined.drop_duplicates()
+    combined = normalize_canonical_types(combined)
+    combined = combined.drop_duplicates(subset=TRANSACTION_DEDUPE_KEYS)
     combined = combined.sort_values("datetime").reset_index(drop=True)
     validate_canonical_schema(combined)
 
