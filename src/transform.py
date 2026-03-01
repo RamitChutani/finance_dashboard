@@ -1,8 +1,42 @@
+"""
+Data transformation (ETL) module.
+
+Why this file is separate from `app.py`:
+- Raw CSV ingestion and normalization are backend/data concerns.
+- Running transforms independently keeps dashboard startup lightweight.
+- Data logic can be tested and evolved without touching UI code.
+
+This structure is a design choice for clarity and utility, not a Streamlit requirement.
+"""
+
 import pandas as pd
 from pathlib import Path
 
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
 MASTER_CSV = Path(__file__).parent.parent / "data" / "transactions.csv" # this is just a pointed to a location, does not check if it exists yet
+RAW_TO_CANONICAL_COLS = {
+    "TIME": "datetime",
+    "TYPE": "type",
+    "AMOUNT": "amount",
+    "CATEGORY": "category",
+    "ACCOUNT": "account",
+    "NOTES ": "notes",
+}
+CANONICAL_COLUMNS = [
+    "datetime",
+    "type",
+    "amount",
+    "category",
+    "account",
+    "notes",
+    "date",
+    "month",
+    "year",
+    "day",
+    "signed_amount",
+    "is_opening_balance",
+]
+ALLOWED_TYPES = {"Income", "Expense", "Transfer"}
 
 
 # Why do we not ensure path exists here itself?
@@ -15,18 +49,17 @@ MASTER_CSV = Path(__file__).parent.parent / "data" / "transactions.csv" # this i
 
 def clean_raw(df: pd.DataFrame) -> pd.DataFrame:
 
-    # renaming columns for clarity, using "NOTES " because original csv has blank
-    df = df.rename(columns={
-        "TIME": "datetime",
-        "TYPE": "type",
-        "AMOUNT": "amount",
-        "CATEGORY": "category",
-        "ACCOUNT": "account",
-        "NOTES ": "notes",
-    })
+    validate_raw_columns(df)
+
+    # Rename export columns to project-level canonical names.
+    df = df.rename(columns=RAW_TO_CANONICAL_COLS)
 
     # extracting date relevant features from datetime
-    df["datetime"] = pd.to_datetime(df["datetime"])
+    df["datetime"] = pd.to_datetime(df["datetime"], format="mixed", errors="raise")
+    df["amount"] = pd.to_numeric(df["amount"], errors="raise")
+    if (df["amount"] < 0).any():
+        raise ValueError("Raw AMOUNT must be non-negative; sign is derived from TYPE.")
+
     df["date"] = df["datetime"].dt.date
     df["month"] = df["datetime"].dt.month
     df["year"] = df["datetime"].dt.year
@@ -34,6 +67,9 @@ def clean_raw(df: pd.DataFrame) -> pd.DataFrame:
 
     # cleaning the type column values to remove prefixes
     df["type"] = df["type"].str.replace(r"^[\(\+\-\*\) ]+", "", regex=True).str.strip()
+    unknown_types = set(df["type"].dropna().unique()) - ALLOWED_TYPES
+    if unknown_types:
+        raise ValueError(f"Unsupported transaction type(s): {sorted(unknown_types)}")
     
     # creating new column to make amount value positive for income, negative for expense, 0 for transfers across accounts
     df["signed_amount"] = df.apply(
@@ -45,7 +81,33 @@ def clean_raw(df: pd.DataFrame) -> pd.DataFrame:
     # flagging rows that are not real transactions, but opening balance rows for various accounts
     df["is_opening_balance"] = df["notes"].str.lower().str.contains("starting|opening balance", na=False)
 
+    df = df[CANONICAL_COLUMNS]
+    validate_canonical_schema(df)
     return df
+
+
+def validate_raw_columns(df: pd.DataFrame) -> None:
+    # Fail early when the export format changes unexpectedly.
+    required_raw = set(RAW_TO_CANONICAL_COLS.keys())
+    missing = sorted(required_raw - set(df.columns))
+    if missing:
+        raise ValueError(f"Raw file is missing required column(s): {missing}")
+
+
+def validate_canonical_schema(df: pd.DataFrame) -> None:
+    # Contract check: app/features can rely on this shape and core constraints.
+    missing = sorted(set(CANONICAL_COLUMNS) - set(df.columns))
+    if missing:
+        raise ValueError(f"Canonical schema missing column(s): {missing}")
+
+    if df["datetime"].isna().any():
+        raise ValueError("`datetime` contains null values.")
+    if (df["month"] < 1).any() or (df["month"] > 12).any():
+        raise ValueError("`month` must be between 1 and 12.")
+    if (df["day"] < 1).any() or (df["day"] > 31).any():
+        raise ValueError("`day` must be between 1 and 31.")
+    if df["is_opening_balance"].dtype != bool:
+        raise ValueError("`is_opening_balance` must be boolean.")
 
 def run():
     raw_files = list(RAW_DIR.glob("*.csv")) # creates a list of paths to be read later
@@ -56,11 +118,18 @@ def run():
     frames = [pd.read_csv(f) for f in raw_files] # creates a list of dataframes from paths
     cleaned = clean_raw(pd.concat(frames, ignore_index=True)) # concat first combines into one big df, then cleans it according to clean_raw() function
 
-    master = pd.read_csv(MASTER_CSV) if MASTER_CSV.exists() else pd.DataFrame() # the master df that gets cleaned df added to it, so starts with an empty df
+    master = pd.read_csv(MASTER_CSV) if MASTER_CSV.exists() else pd.DataFrame(columns=CANONICAL_COLUMNS)
+    if not master.empty:
+        missing_master_cols = sorted(set(CANONICAL_COLUMNS) - set(master.columns))
+        if missing_master_cols:
+            raise ValueError(f"Existing master CSV is missing required column(s): {missing_master_cols}")
 
     combined = pd.concat([master, cleaned], ignore_index=True) # add latest cleaned csv to master
+    combined = combined[CANONICAL_COLUMNS]
+    combined["datetime"] = pd.to_datetime(combined["datetime"], format="mixed", errors="raise")
     combined = combined.drop_duplicates()
     combined = combined.sort_values("datetime").reset_index(drop=True)
+    validate_canonical_schema(combined)
 
     MASTER_CSV.parent.mkdir(parents=True, exist_ok=True) # safety measure to prevent FileNotFoundError before we write the combined df to the CSV file
     combined.to_csv(MASTER_CSV, index=False) # write back to CSV file after joining and cleaning the dataframes

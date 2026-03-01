@@ -1,3 +1,13 @@
+"""
+Shared helper utilities for the Streamlit app.
+
+Why this file is separate from `app.py`:
+- Keeps UI code focused on presentation.
+- Centralizes data-loading logic in one reusable place.
+- Makes it easy to reuse the same loader across future `pages/`.
+- Improves maintainability and testability of non-UI logic.
+"""
+
 import pandas as pd
 import streamlit as st
 from pathlib import Path
