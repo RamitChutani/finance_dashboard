@@ -11,6 +11,7 @@ Why this file is separate from `app.py`:
 import pandas as pd
 import streamlit as st
 from pathlib import Path
+from src.balance import build_account_balance_timeline
 
 MASTER_CSV = Path(__file__).parent.parent / "data" / "transactions.csv"
 
@@ -22,3 +23,9 @@ def load_data() -> pd.DataFrame:
     df = pd.read_csv(MASTER_CSV)
     df["datetime"] = pd.to_datetime(df["datetime"])
     return df
+
+
+@st.cache_data
+def load_account_balances() -> pd.DataFrame:
+    # Build once and cache so account pages/charts can reuse the same timeline.
+    return build_account_balance_timeline(load_data())

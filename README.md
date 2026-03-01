@@ -48,6 +48,7 @@ Build in small vertical slices, with each step as a clean git stopping point.
 ## Current Capability
 - Imports and normalizes raw CSV exports into canonical `data/transactions.csv`.
 - Enforces canonical transaction schema and validation checks in transform pipeline.
+- Computes daily running balance per account using transfer-aware account flows.
 - Provides a Streamlit dashboard with:
   - timeline filters (`YTD`, `FYTD`, `Last 1/3/6/12M`, `MTD`, `All Time`, custom range)
   - type filter (`Income`, `Expense`, `Transfer`)
@@ -93,3 +94,14 @@ The cleaned dataset (`data/transactions.csv`) contains:
 - `day` (1-31)
 - `signed_amount` (Income positive, Expense negative, Transfer 0)
 - `is_opening_balance` (boolean)
+
+## Account Balance Output (Step 2)
+`src.balance.build_account_balance_timeline(df)` returns:
+- `date`
+- `account`
+- `net_flow`
+- `running_balance`
+
+Transfer rows are expanded from `from_account->to_account` into:
+- negative flow for source account
+- positive flow for destination account

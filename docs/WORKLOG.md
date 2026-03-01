@@ -31,16 +31,19 @@ Use this file to preserve context between sessions.
 - Redesigned dashboard filters to timeline-based presets/custom range.
 - Added teaching-style comments in key files.
 - Added canonical schema + validation checks to transform pipeline.
+- Added account balance engine to compute transfer-aware running balances per account.
 
 ### Validation
 - Commands run:
   - `python -m py_compile app.py src/helpers.py src/transform.py`
   - `python src/transform.py`
+  - `python -m py_compile main.py src/balance.py src/helpers.py`
+  - `python main.py`
 - Result:
   - pass
 
 ### Next Step
-- Step 2: implement running balance engine per account.
+- Step 3: add account balance timeline and allocation charts to the dashboard UI.
 
 ### Blockers / Questions
 - None.
